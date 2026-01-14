@@ -42,6 +42,10 @@ class AppStorage {
     await _prefs.setString(_kMatches, jsonEncode(list));
   }
 
+  Future<void> clearMatches() async {
+    await _prefs.remove(_kMatches);
+  }
+
   Future<void> clearDiscoverDismissed() async {
     await _prefs.remove(_kDiscoverDismissed);
   }

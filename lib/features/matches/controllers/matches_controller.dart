@@ -28,6 +28,12 @@ class MatchesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> devClearMatches() async {
+    _matches.clear();
+    await storage.clearMatches();
+    notifyListeners();
+  }
+
   Future<void> like(Profile p) async {
     _liked[p.id] = {
       'type': 'like',

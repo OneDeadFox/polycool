@@ -64,16 +64,18 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
 
               await context.read<DiscoverController>().devResetDiscover();
               await context.read<MatchesController>().devClearLikes();
+              await context.read<MatchesController>().devClearMatches();
 
               if (!mounted) return;
 
-              // Reset carousel back to first card
               if (_carousel.hasClients) {
                 _carousel.jumpToPage(0);
               }
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Discover reset (dev).')),
+                const SnackBar(
+                  content: Text('Discover, likes, and matches reset (dev).'),
+                ),
               );
             },
           ),
