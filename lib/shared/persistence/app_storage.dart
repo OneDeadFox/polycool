@@ -34,6 +34,10 @@ class AppStorage {
     await _prefs.setString('$_kChatPrefix$profileId', jsonEncode(data));
   }
 
+  Future<void> clearAll() async {
+    await _prefs.clear();
+  }
+
   Future<void> clearChatMessages(String profileId) async {
     await _prefs.remove('$_kChatPrefix$profileId');
   }

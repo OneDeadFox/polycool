@@ -10,6 +10,8 @@ import 'controllers/reflection_controller.dart';
 import 'models/profile.dart';
 import 'models/reflection.dart';
 
+import '../settings/settings_screen.dart';
+
 import 'profile_setup/profile_setup_screen.dart';
 import 'photos/my_photos_screen.dart';
 
@@ -43,6 +45,14 @@ class ProfileScreen extends StatelessWidget {
                   builder: (_) => const ProfileSetupScreen(isEdit: true),
                 ),
               );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
             },
           ),
         ],
