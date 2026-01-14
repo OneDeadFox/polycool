@@ -8,7 +8,7 @@ import '../features/discover/discover_controller.dart';
 import '../features/profile/controllers/profile_controller.dart';
 import '../features/profile/controllers/reflection_controller.dart';
 import '../features/matches/controllers/matches_controller.dart';
-
+import '../features/groups/controllers/groups_controller.dart';
 import '../features/profile/models/profile.dart';
 
 import 'theme/app_theme.dart';
@@ -45,6 +45,10 @@ class PolycoolApp extends StatelessWidget {
 
         ChangeNotifierProvider(
           create: (_) => MatchesController(storage: storage),
+        ),
+        
+        ChangeNotifierProvider(
+          create: (_) => GroupsController(storage: storage),
         ),
 
         // Monetization / Super Likes / Subscription

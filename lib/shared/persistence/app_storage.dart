@@ -18,6 +18,29 @@ class AppStorage {
       'discover_liked_profiles'; // Map<String, dynamic>
   static const _kMatches = 'matches_threads'; // List<Map<String, dynamic>>
   static const _kChatPrefix = 'chat_thread_'; // chat_thread_<profileId>
+  static const _kJoinedGroups = 'groups_joined_ids';
+  static const _kGroupPosts = 'groups_posts'; // List<Map<String, dynamic>>
+
+  List<String> loadJoinedGroupIds() {
+    final raw = _prefs.getStringList(_kJoinedGroups);
+    return raw ?? <String>[];
+  }
+
+  Future<void> saveJoinedGroupIds(List<String> ids) async {
+    await _prefs.setStringList(_kJoinedGroups, ids);
+  }
+
+  List<Map<String, dynamic>> loadGroupPostsRaw() {
+    final raw = _prefs.getString(_kGroupPosts);
+    if (raw == null || raw.isEmpty) return [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return [];
+    return decoded.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveGroupPostsRaw(List<Map<String, dynamic>> posts) async {
+    await _prefs.setString(_kGroupPosts, jsonEncode(posts));
+  }
 
   List<Map<String, dynamic>> loadChatMessages(String profileId) {
     final raw = _prefs.getString('$_kChatPrefix$profileId');
