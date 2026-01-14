@@ -7,8 +7,10 @@ import '../profile/controllers/reflection_controller.dart';
 import '../profile/models/profile.dart';
 import '../profile/other_profile/other_profile_screen.dart';
 
+import '../discover/discover_controller.dart';
 import 'controllers/matches_controller.dart';
 import 'models/match_thread.dart';
+import 'chat/chat_thread_screen.dart';
 
 class MatchesScreen extends StatelessWidget {
   const MatchesScreen({super.key});
@@ -18,6 +20,7 @@ class MatchesScreen extends StatelessWidget {
     final threads = context.watch<MatchesController>().matches;
     final matches = context.read<MatchesController>();
     final reflections = context.read<ReflectionController>().orderedInsights;
+    final discover = context.read<DiscoverController>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Matches')),
@@ -43,24 +46,29 @@ class MatchesScreen extends StatelessWidget {
                   onOpenChat: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => _ChatThreadScreen(
+                        builder: (_) => ChatThreadScreen(
+                          profileId: t.profileId,
                           title: t.displayName,
                         ),
                       ),
                     );
                   },
                   onOpenProfile: () {
-                    // v1: build a lightweight Profile for viewing
-                    final p = Profile(
-                      id: t.profileId,
-                      displayName: t.displayName,
-                      photos: const [],
-                      interests: const [],
-                      relationshipContextTags: const [],
-                      seeking: const [],
-                      preferences: const [],
-                      showPreferences: false,
-                    );
+                    // Prefer the full profile from Discover seed list
+                    final full = discover.getById(t.profileId);
+
+                    final p =
+                        full ??
+                        Profile(
+                          id: t.profileId,
+                          displayName: t.displayName,
+                          photos: const [],
+                          interests: const [],
+                          relationshipContextTags: const [],
+                          seeking: const [],
+                          preferences: const [],
+                          showPreferences: false,
+                        );
 
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -103,16 +111,13 @@ class _MatchRow extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: onOpenChat, // tapping anywhere opens chat
+        onTap: onOpenChat,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               GestureDetector(
-                onTap: () {
-                  // prevent tap from also triggering chat
-                  onOpenProfile();
-                },
+                onTap: onOpenProfile,
                 child: CircleAvatar(
                   radius: 26,
                   backgroundImage: hasPhoto ? FileImage(File(path!)) : null,
@@ -127,8 +132,8 @@ class _MatchRow extends StatelessWidget {
                     Text(
                       thread.displayName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -142,26 +147,6 @@ class _MatchRow extends StatelessWidget {
               const Icon(Icons.chevron_right),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// v1 placeholder chat thread screen.
-/// Replace later with your real Chat screen routing if you already have one.
-class _ChatThreadScreen extends StatelessWidget {
-  final String title;
-  const _ChatThreadScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Text(
-          'Chat thread (v1)',
-          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ),
     );

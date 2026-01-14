@@ -91,6 +91,13 @@ class DiscoverController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Profile? getById(String id) {
+    for (final p in _all) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
   Future<void> undoLastDismiss() async {
     final last = _lastDismiss;
     if (last == null) return;

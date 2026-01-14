@@ -17,6 +17,26 @@ class AppStorage {
   static const _kLikedProfiles =
       'discover_liked_profiles'; // Map<String, dynamic>
   static const _kMatches = 'matches_threads'; // List<Map<String, dynamic>>
+  static const _kChatPrefix = 'chat_thread_'; // chat_thread_<profileId>
+
+  List<Map<String, dynamic>> loadChatMessages(String profileId) {
+    final raw = _prefs.getString('$_kChatPrefix$profileId');
+    if (raw == null || raw.isEmpty) return [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return [];
+    return decoded.cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveChatMessages(
+    String profileId,
+    List<Map<String, dynamic>> data,
+  ) async {
+    await _prefs.setString('$_kChatPrefix$profileId', jsonEncode(data));
+  }
+
+  Future<void> clearChatMessages(String profileId) async {
+    await _prefs.remove('$_kChatPrefix$profileId');
+  }
 
   Map<String, dynamic> loadLikedProfiles() {
     final raw = _prefs.getString(_kLikedProfiles);

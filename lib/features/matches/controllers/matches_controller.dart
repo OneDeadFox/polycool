@@ -34,6 +34,31 @@ class MatchesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateThreadLastMessage({
+    required String profileId,
+    required String? lastMessage,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final idx = _matches.indexWhere((m) => m.profileId == profileId);
+    if (idx == -1) return;
+
+    final current = _matches[idx];
+    final updated = MatchThread(
+      profileId: current.profileId,
+      displayName: current.displayName,
+      photoPath: current.photoPath,
+      lastMessage: (lastMessage ?? '').trim(),
+      updatedAtMs: now,
+    );
+
+    _matches[idx] = updated;
+    _matches.sort((a, b) => b.updatedAtMs.compareTo(a.updatedAtMs));
+
+    await storage.saveMatchesRaw(_matches.map((m) => m.toJson()).toList());
+    notifyListeners();
+  }
+
   Future<void> like(Profile p) async {
     _liked[p.id] = {
       'type': 'like',
