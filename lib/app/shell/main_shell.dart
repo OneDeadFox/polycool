@@ -4,21 +4,20 @@ import '../../features/matches/matches_screen.dart';
 import '../../features/groups/groups_home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 
-
-class AppScaffold extends StatefulWidget {
-  const AppScaffold({super.key});
+class MainShell extends StatefulWidget {
+  const MainShell({super.key});
 
   @override
-  State<AppScaffold> createState() => _AppScaffoldState();
+  State<MainShell> createState() => _MainShellState();
 }
 
-class _AppScaffoldState extends State<AppScaffold> {
+class _MainShellState extends State<MainShell> {
   int _index = 0;
 
   final _screens = const [
     DiscoverScreen(),
     MatchesScreen(),
-    GroupsScreen(),
+    GroupsHomeScreen(),
     ProfileScreen(),
   ];
 
@@ -28,7 +27,10 @@ class _AppScaffoldState extends State<AppScaffold> {
       body: _screens[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: (i) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          setState(() => _index = i);
+        },
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.explore_outlined),
@@ -36,8 +38,8 @@ class _AppScaffoldState extends State<AppScaffold> {
             label: 'Discover',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
+            icon: Icon(Icons.favorite_border),
+            selectedIcon: Icon(Icons.favorite),
             label: 'Matches',
           ),
           NavigationDestination(

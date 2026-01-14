@@ -1,82 +1,215 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+
 import 'package:provider/provider.dart';
+import '../../matches/controllers/matches_controller.dart';
 
-import '../../app/theme/app_colors.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../profile/models/profile.dart';
+import '../../profile/models/reflection.dart';
 
-import 'controllers/profile_controller.dart';
-import 'controllers/reflection_controller.dart';
-import 'models/profile.dart';
-import 'models/reflection.dart';
+/// UI-first v1: other user profile view.
+/// - No badge mentions
+/// - No activity visibility controls
+/// - Like + Super Like action row
+class OtherProfileScreen extends StatefulWidget {
+  final Profile profile;
+  final List<ReflectionInsight> reflections;
 
-import 'profile_setup/profile_setup_screen.dart';
-import 'photos/my_photos_screen.dart';
+  // v1: pass in whether viewer has super likes available
+  final int superLikesAvailable;
+  final bool viewerIsSubscriber;
 
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const OtherProfileScreen({
+    super.key,
+    required this.profile,
+    required this.reflections,
+    this.superLikesAvailable = 0,
+    this.viewerIsSubscriber = false,
+  });
+
+  @override
+  State<OtherProfileScreen> createState() => _OtherProfileScreenState();
+}
+
+class _OtherProfileScreenState extends State<OtherProfileScreen> {
+  int _photoIndex = 0;
+  final _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onSuperLikePressed() async {
+    if (widget.superLikesAvailable > 0) {
+      final message = await showDialog<String?>(
+        context: context,
+        builder: (ctx) {
+          final ctrl = TextEditingController();
+          return AlertDialog(
+            title: const Text('Send a Super Like'),
+            content: TextField(
+              controller: ctrl,
+              maxLength: 200,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Optional message (200 chars max)',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+                child: const Text('Send'),
+              ),
+            ],
+          );
+        },
+      );
+
+      // v1 stub: you’ll later wire this to Matches/Chat + local state.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message == null || message.isEmpty
+                ? 'Super Like sent.'
+                : 'Super Like sent with message.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Out of super likes: subscriber vs non-subscriber dialog
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Out of Super Likes'),
+          content: Text(
+            widget.viewerIsSubscriber
+                ? 'You can buy more now, or wait until they replenish on renewal.'
+                : 'You can buy Super Likes now, or upgrade for replenishing Super Likes.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Not now'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Purchase flow (stub)')),
+                );
+              },
+              child: const Text('Buy Super Likes'),
+            ),
+            if (!widget.viewerIsSubscriber)
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Upgrade flow (stub)')),
+                  );
+                },
+                child: const Text('Upgrade'),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileController>().me;
-    final reflections = context.watch<ReflectionController>().orderedInsights;
+    final p = widget.profile;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.visibility_outlined),
-            onPressed: () {
+          TextButton(
+            onPressed: () async {
+              await context.read<MatchesController>().simulateMatch(
+                widget.profile,
+              );
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Activity visibility controls coming later.'),
+                  content: Text('Simulated match. Added to Matches.'),
                 ),
               );
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ProfileSetupScreen(isEdit: true),
-                ),
-              );
-            },
+            child: const Text('Simulate match'),
           ),
         ],
+        title: const Text('Profile'),
       ),
+
+      // Bottom actions (always visible)
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Liked (stub).')),
+                    );
+                  },
+                  icon: const Icon(Icons.favorite_border),
+                  label: const Text('Like'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _onSuperLikePressed,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Super Like'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // 1) Display name
+          // Name row (left: name,age) (right: location)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-            child: _NameRow(profile: profile),
+            child: _NameRow(profile: p),
           ),
 
-          // 2) Photo carousel (edge-to-edge)
-          GestureDetector(
-            onTap: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const MyPhotosScreen()));
-            },
-            child: const AspectRatio(
-              aspectRatio: 1,
-              child: _ProfilePhotoCarousel(),
+          // Edge-to-edge carousel
+          AspectRatio(
+            aspectRatio: 1,
+            child: _PhotoCarousel(
+              profile: p,
+              controller: _pageController,
+              index: _photoIndex,
+              onIndexChanged: (i) => setState(() => _photoIndex = i),
             ),
           ),
 
-          // 3) Demographics bar
+          // Demographics bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _DemographicsBar(profile: profile),
+            child: _DemographicsBar(profile: p),
           ),
 
-          // About me (between demographics and interests)
-          if (profile.about != null && profile.about!.trim().isNotEmpty) ...[
+          // About (optional)
+          if ((p.about ?? '').trim().isNotEmpty) ...[
             const SizedBox(height: 18),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -86,14 +219,14 @@ class ProfileScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                profile.about!,
+                p.about!,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
           ],
 
-          // 4) Interests
-          if (profile.interests.isNotEmpty) ...[
+          // Interests
+          if (p.interests.isNotEmpty) ...[
             const SizedBox(height: 18),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -102,11 +235,11 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _InlineChips(values: profile.interests),
+              child: _InlineChips(values: p.interests),
             ),
           ],
 
-          // 5) Community reflections (compact single section)
+          // Reflections (compact single section)
           const SizedBox(height: 22),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -115,12 +248,11 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _ReflectionsCompactSection(insights: reflections),
+            child: _ReflectionsCompactSection(insights: widget.reflections),
           ),
 
-          // 6) Sexual preferences (collapsed by default, blends in)
-          if (profile.preferences.isNotEmpty ||
-              profile.showPreferences == false) ...[
+          // Sexual preferences (only show if user enabled + has prefs)
+          if (p.showPreferences && p.preferences.isNotEmpty) ...[
             const SizedBox(height: 22),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
@@ -129,18 +261,18 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _SexualPreferencesCompact(profile: profile),
+              child: _SexualPreferencesCompact(profile: p),
             ),
           ],
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 }
 
-/* ───────────────────────── SECTIONS ───────────────────────── */
+/* ───────────────────────── UI PARTS ───────────────────────── */
 
 class _SectionTitle extends StatelessWidget {
   final String text;
@@ -157,17 +289,37 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _InlineChips extends StatelessWidget {
-  final List<String> values;
-  const _InlineChips({required this.values});
+class _NameRow extends StatelessWidget {
+  final Profile profile;
+  const _NameRow({required this.profile});
 
   @override
   Widget build(BuildContext context) {
-    // Blended: no card, no border; relies on spacing + typography.
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: values.map((v) => Chip(label: Text(v))).toList(),
+    final ageSuffix = profile.age != null ? ', ${profile.age}' : '';
+    final left = '${profile.displayName}$ageSuffix';
+    final loc = (profile.location ?? '').trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            left,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+        ),
+        if (loc.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          Text(
+            loc,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -193,7 +345,7 @@ class _DemographicsBar extends StatelessWidget {
 
     if (items.isEmpty) {
       return Text(
-        'Add pronouns, relationship context, age, or location in Edit Profile.',
+        'No demographics listed.',
         style: Theme.of(context).textTheme.bodySmall,
       );
     }
@@ -215,28 +367,35 @@ class _DemographicsBar extends StatelessWidget {
   }
 }
 
-/* ───────────────────── PHOTO CAROUSEL ───────────────────── */
-
-class _ProfilePhotoCarousel extends StatefulWidget {
-  const _ProfilePhotoCarousel();
-
-  @override
-  State<_ProfilePhotoCarousel> createState() => _ProfilePhotoCarouselState();
-}
-
-class _ProfilePhotoCarouselState extends State<_ProfilePhotoCarousel> {
-  final _controller = PageController();
-  int _index = 0;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _InlineChips extends StatelessWidget {
+  final List<String> values;
+  const _InlineChips({required this.values});
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileController>().me;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: values.map((v) => Chip(label: Text(v))).toList(),
+    );
+  }
+}
+
+class _PhotoCarousel extends StatelessWidget {
+  final Profile profile;
+  final PageController controller;
+  final int index;
+  final ValueChanged<int> onIndexChanged;
+
+  const _PhotoCarousel({
+    required this.profile,
+    required this.controller,
+    required this.index,
+    required this.onIndexChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final photos = profile.photos;
 
     if (photos.isEmpty) {
@@ -249,9 +408,9 @@ class _ProfilePhotoCarouselState extends State<_ProfilePhotoCarousel> {
     return Stack(
       children: [
         PageView.builder(
-          controller: _controller,
+          controller: controller,
           itemCount: photos.length,
-          onPageChanged: (i) => setState(() => _index = i),
+          onPageChanged: onIndexChanged,
           itemBuilder: (context, i) {
             final p = photos[i];
             final path = p.localPath;
@@ -271,7 +430,6 @@ class _ProfilePhotoCarouselState extends State<_ProfilePhotoCarousel> {
             );
           },
         ),
-
         if (photos.length > 1)
           Positioned(
             left: 0,
@@ -290,7 +448,7 @@ class _ProfilePhotoCarouselState extends State<_ProfilePhotoCarousel> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: List.generate(photos.length, (i) {
-                    final active = i == _index;
+                    final active = i == index;
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       margin: const EdgeInsets.symmetric(horizontal: 3),
@@ -311,15 +469,12 @@ class _ProfilePhotoCarouselState extends State<_ProfilePhotoCarousel> {
   }
 }
 
-/* ───────────────────── REFLECTIONS (COMPACT) ───────────────────── */
-
 class _ReflectionsCompactSection extends StatelessWidget {
   final List<ReflectionInsight> insights;
   const _ReflectionsCompactSection({required this.insights});
 
   @override
   Widget build(BuildContext context) {
-    // One unified panel: 4 compact rows.
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -348,14 +503,13 @@ class _ReflectionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = _titleFor(insight.categoryKey);
     final clamped = insight.barValue.clamp(0.0, 0.9);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title,
+          _titleFor(insight.categoryKey),
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
@@ -399,48 +553,39 @@ class _ReflectionRow extends StatelessWidget {
   }
 }
 
-/* ───────────────────── SEXUAL PREFERENCES (COMPACT) ───────────────────── */
-
 class _SexualPreferencesCompact extends StatelessWidget {
   final Profile profile;
   const _SexualPreferencesCompact({required this.profile});
 
   @override
   Widget build(BuildContext context) {
-    final visible = profile.showPreferences && profile.preferences.isNotEmpty;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: !visible
-          ? Text(
-              'Hidden. You can enable this in Edit Profile.',
-              style: Theme.of(context).textTheme.bodySmall,
-            )
-          : ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: EdgeInsets.zero,
-              title: const Text('Tap to view'),
-              children: [
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: profile.preferences.map((p) {
-                    final intensity = _intensityLabel(p.intensity.name);
-                    return Chip(label: Text('${p.label} • $intensity'));
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'This section reflects preferences not obligations.',
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-              ],
-            ),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: EdgeInsets.zero,
+        title: const Text('Tap to view'),
+        children: [
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: profile.preferences.map((p) {
+              final intensity = _intensityLabel(p.intensity.name);
+              return Chip(label: Text('${p.label} • $intensity'));
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This section reflects preferences not obligations.',
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ],
+      ),
     );
   }
 
@@ -457,41 +602,5 @@ class _SexualPreferencesCompact extends StatelessWidget {
       default:
         return key;
     }
-  }
-}
-
-class _NameRow extends StatelessWidget {
-  final Profile profile;
-  const _NameRow({required this.profile});
-
-  @override
-  Widget build(BuildContext context) {
-    final ageSuffix = profile.age != null ? ', ${profile.age}' : '';
-    final left = '${profile.displayName}$ageSuffix';
-
-    final loc = (profile.location ?? '').trim();
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Text(
-            left,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-        ),
-        if (loc.isNotEmpty) ...[
-          const SizedBox(width: 12),
-          Text(
-            loc,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ],
-      ],
-    );
   }
 }

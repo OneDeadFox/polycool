@@ -1,73 +1,62 @@
 import 'package:flutter/material.dart';
+import '../../../app/theme/app_colors.dart';
 
 class ReflectionCard extends StatelessWidget {
-  /// Title is optional (e.g. "Communication style"). If null, it won't render.
-  final String? title;
-
-  /// Main statement shown to the user.
+  final String categoryLabel;
   final String statement;
-
-  /// Value from 0.0 to 1.0. We will *display* up to 0.90 max (never 100%).
-  final double value;
-
-  /// Optional gentle prompt. If null/empty, it won't render.
-  final String? prompt;
-
-  /// Optional override for gradient colors (keep within your palette later).
-  final List<Color>? gradient;
+  final double value; // 0.0 – 1.0
+  final String? gentlePrompt;
 
   const ReflectionCard({
     super.key,
-    this.title,
+    required this.categoryLabel,
     required this.statement,
     required this.value,
-    this.prompt,
-    this.gradient,
+    this.gentlePrompt,
   });
+
+  /// Safe placeholder for v1 before reflection data is wired
+  const ReflectionCard.placeholder({
+    super.key,
+    required this.categoryLabel,
+  })  : statement = 'Community insights will appear here over time.',
+        value = 0.15,
+        gentlePrompt = null;
 
   @override
   Widget build(BuildContext context) {
-    final v = value.clamp(0.0, 1.0);
-    final hasTitle = title != null && title!.trim().isNotEmpty;
-    final hasPrompt = prompt != null && prompt!.trim().isNotEmpty;
+    // Cap visual fill at 90% max (never show 100%)
+    final visualValue = value.clamp(0.0, 0.9);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
+    return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (hasTitle) ...[
-              Text(
-                title!,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-            ],
+            Text(
+              categoryLabel,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+
             Text(
               statement,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
+
             const SizedBox(height: 12),
-            _NeverFullGradientBar(
-              value: v,
-              gradient: gradient,
-            ),
-            if (hasPrompt) ...[
+
+            _ReflectionBar(value: visualValue),
+
+            if (gentlePrompt != null) ...[
               const SizedBox(height: 12),
               Text(
-                prompt!,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                      height: 1.35,
-                    ),
+                gentlePrompt!,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontStyle: FontStyle.italic),
               ),
             ],
           ],
@@ -77,50 +66,26 @@ class ReflectionCard extends StatelessWidget {
   }
 }
 
-class _NeverFullGradientBar extends StatelessWidget {
+class _ReflectionBar extends StatelessWidget {
   final double value;
-  final List<Color>? gradient;
 
-  const _NeverFullGradientBar({
-    required this.value,
-    this.gradient,
-  });
+  const _ReflectionBar({required this.value});
 
   @override
   Widget build(BuildContext context) {
-    // Never show a fully filled bar.
-    // We cap the displayed fill at 0.90 (90%).
-    final displayed = (value * 0.90).clamp(0.0, 0.90);
-
-    final colors = gradient ??
-        const [
-          Color(0xFF4F46E5), // indigo-ish
-          Color(0xFF60A5FA), // soft blue
-        ];
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
-      child: SizedBox(
-        height: 12,
-        child: Stack(
-          children: [
-            // Track
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFFEFF6FF), // very light blue track
-              ),
+      child: Container(
+        height: 10,
+        color: AppColors.surfaceMuted,
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: value,
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.reflectionGradient,
             ),
-            // Fill
-            FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: displayed, // 0.0 -> 0.90
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: colors),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
