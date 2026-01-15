@@ -23,6 +23,37 @@ class AppStorage {
   static const _kAnonDisclosureShown = 'community_anon_disclosure_shown';
   static const _kJoinedGroups = 'groups_joined_ids';
   static const _kGroupPosts = 'groups_posts'; // json list
+  static const _kGroupsList =
+      'groups_list_v1'; // json list of CommunityGroup maps
+  static const _kGroupReplies = 'group_replies_v1';
+
+  List<Map<String, dynamic>> loadGroupRepliesRaw() {
+    final raw = _prefs.getString(_kGroupReplies);
+    if (raw == null || raw.isEmpty) return [];
+    return decodeJsonList(raw);
+  }
+
+  Future<void> saveGroupRepliesRaw(List<Map<String, dynamic>> replies) async {
+    await _prefs.setString(_kGroupReplies, encodeJsonList(replies));
+  }
+
+  Future<void> clearGroupRepliesRaw() async {
+    await _prefs.remove(_kGroupReplies);
+  }
+
+  List<Map<String, dynamic>> loadGroupsRaw() {
+    final raw = _prefs.getString(_kGroupsList);
+    if (raw == null || raw.isEmpty) return [];
+    return decodeJsonList(raw);
+  }
+
+  Future<void> saveGroupsRaw(List<Map<String, dynamic>> groups) async {
+    await _prefs.setString(_kGroupsList, encodeJsonList(groups));
+  }
+
+  Future<void> clearGroupsRaw() async {
+    await _prefs.remove(_kGroupsList);
+  }
 
   List<String> loadJoinedGroupIds() {
     return _prefs.getStringList(_kJoinedGroups) ?? <String>[];
