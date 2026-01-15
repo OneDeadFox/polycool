@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'controllers/groups_controller.dart';
-import 'models/group.dart';
+import 'package:polycool/features/groups/controllers/groups_controller.dart';
+import 'package:polycool/features/groups/models/group.dart';
 
-class GroupDetailScreen extends StatelessWidget {
+class CommunityDetailScreen extends StatelessWidget {
   final CommunityGroup group;
-  const GroupDetailScreen({super.key, required this.group});
+  const CommunityDetailScreen({super.key, required this.group});
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.watch<GroupsController>();
-    final joined = controller.isJoined(group.id);
-    final posts = controller.postsFor(group.id);
+    final groups = context.watch<GroupsController>();
+    final joined = groups.isJoined(group.id);
+    final posts = groups.postsFor(group.id);
 
     return Scaffold(
       appBar: AppBar(title: Text(group.name)),

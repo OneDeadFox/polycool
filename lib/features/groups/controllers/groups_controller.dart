@@ -14,6 +14,7 @@ class GroupsController extends ChangeNotifier {
   GroupsController({required this.storage}) {
     _joined = storage.loadJoinedGroupIds().toSet();
     _posts = storage.loadGroupPostsRaw().map(GroupPost.fromJson).toList();
+
     if (_posts.isEmpty) {
       _posts = _seedPosts();
       storage.saveGroupPostsRaw(_posts.map((p) => p.toJson()).toList());
@@ -21,7 +22,11 @@ class GroupsController extends ChangeNotifier {
   }
 
   List<CommunityGroup> get groups => List.unmodifiable(_groups);
+
   bool isJoined(String groupId) => _joined.contains(groupId);
+
+  List<CommunityGroup> joinedGroups() =>
+      _groups.where((g) => _joined.contains(g.id)).toList();
 
   List<GroupPost> postsFor(String groupId) {
     final list = _posts.where((p) => p.groupId == groupId).toList();
@@ -54,8 +59,8 @@ class GroupsController extends ChangeNotifier {
       text: cleaned,
       createdAtMs: DateTime.now().millisecondsSinceEpoch,
     );
-    _posts.add(post);
 
+    _posts.add(post);
     await storage.saveGroupPostsRaw(_posts.map((p) => p.toJson()).toList());
     notifyListeners();
   }
@@ -93,15 +98,15 @@ class GroupsController extends ChangeNotifier {
           groupId: 'g1',
           author: 'Moderator',
           text:
-              'Reminder: this space is for learning, not judging. If you’re sharing a hard story, keep details minimal and focus on needs + next steps.',
-          createdAtMs: DateTime.now().subtract(const Duration(days: 1)).millisecondsSinceEpoch,
+              'Reminder: this space is for learning, not judging. Share with care and focus on needs + next steps.',
+          createdAtMs: 0,
         ),
         GroupPost(
           id: 'p2',
           groupId: 'g2',
           author: 'Rowan',
-          text: 'What’s a good first message to someone when you’re new and nervous?',
-          createdAtMs: DateTime.now().subtract(const Duration(hours: 14)).millisecondsSinceEpoch,
+          text: 'What’s a good first message when you’re new and nervous?',
+          createdAtMs: 0,
         ),
       ];
 }

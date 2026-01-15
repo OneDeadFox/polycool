@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../features/discover/discover_screen.dart';
 import '../../features/matches/matches_screen.dart';
-import '../../features/groups/groups_home_screen.dart';
+import '../../features/community/community_home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 
 

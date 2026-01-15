@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'controllers/groups_controller.dart';
 import 'group_detail_screen.dart';
 import 'models/group.dart';
+import 'widgets/my_groups_section.dart';
 
 import 'package:polycool/features/settings/settings_screen.dart';
 
@@ -57,17 +58,20 @@ class _GroupsHomeScreenState extends State<GroupsHomeScreen> {
           ),
           const SizedBox(height: 14),
 
-          // Header row (fixed-width button avoids Infinity constraints)
+          const MyGroupsSection(),
+          const SizedBox(height: 18),
+
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'Groups',
+                  'All Groups',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
                 ),
               ),
+              // FIX: finite width button to avoid infinite width constraints
               SizedBox(
                 width: 96,
                 child: OutlinedButton(
@@ -127,7 +131,6 @@ class _GroupCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title row (no unconstrained buttons)
                 Row(
                   children: [
                     Expanded(
@@ -151,14 +154,8 @@ class _GroupCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-
-                Text(
-                  group.tagline,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-
+                Text(group.tagline, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 10),
-
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,

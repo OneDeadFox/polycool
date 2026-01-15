@@ -18,12 +18,14 @@ class AppStorage {
       'discover_liked_profiles'; // Map<String, dynamic>
   static const _kMatches = 'matches_threads'; // List<Map<String, dynamic>>
   static const _kChatPrefix = 'chat_thread_'; // chat_thread_<profileId>
+  static const _kCommunityUsername = 'community_username';
+  static const _kAnonymousBrowsing = 'community_anonymous_browsing';
+  static const _kAnonDisclosureShown = 'community_anon_disclosure_shown';
   static const _kJoinedGroups = 'groups_joined_ids';
-  static const _kGroupPosts = 'groups_posts'; // List<Map<String, dynamic>>
+  static const _kGroupPosts = 'groups_posts'; // json list
 
   List<String> loadJoinedGroupIds() {
-    final raw = _prefs.getStringList(_kJoinedGroups);
-    return raw ?? <String>[];
+    return _prefs.getStringList(_kJoinedGroups) ?? <String>[];
   }
 
   Future<void> saveJoinedGroupIds(List<String> ids) async {
@@ -33,13 +35,31 @@ class AppStorage {
   List<Map<String, dynamic>> loadGroupPostsRaw() {
     final raw = _prefs.getString(_kGroupPosts);
     if (raw == null || raw.isEmpty) return [];
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) return [];
-    return decoded.cast<Map<String, dynamic>>();
+    final decoded = decodeJsonList(raw);
+    return decoded;
   }
 
   Future<void> saveGroupPostsRaw(List<Map<String, dynamic>> posts) async {
-    await _prefs.setString(_kGroupPosts, jsonEncode(posts));
+    await _prefs.setString(_kGroupPosts, encodeJsonList(posts));
+  }
+
+  String? getCommunityUsername() => _prefs.getString(_kCommunityUsername);
+
+  Future<void> setCommunityUsername(String username) async {
+    await _prefs.setString(_kCommunityUsername, username);
+  }
+
+  bool getAnonymousBrowsing() => _prefs.getBool(_kAnonymousBrowsing) ?? false;
+
+  Future<void> setAnonymousBrowsing(bool enabled) async {
+    await _prefs.setBool(_kAnonymousBrowsing, enabled);
+  }
+
+  bool getAnonDisclosureShown() =>
+      _prefs.getBool(_kAnonDisclosureShown) ?? false;
+
+  Future<void> setAnonDisclosureShown(bool shown) async {
+    await _prefs.setBool(_kAnonDisclosureShown, shown);
   }
 
   List<Map<String, dynamic>> loadChatMessages(String profileId) {

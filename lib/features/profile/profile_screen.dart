@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:polycool/features/community/widgets/my_communities_section.dart';
 
 import '../../app/theme/app_colors.dart';
 

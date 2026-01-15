@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../features/discover/discover_screen.dart';
 import '../../features/matches/matches_screen.dart';
-import '../../features/groups/groups_home_screen.dart';
+import '../../features/community/community_home_screen.dart';
 import '../../features/profile/profile_screen.dart';
 
 class MainShell extends StatefulWidget {
@@ -17,7 +17,7 @@ class _MainShellState extends State<MainShell> {
   final _screens = const [
     DiscoverScreen(),
     MatchesScreen(),
-    GroupsHomeScreen(),
+    CommunityHomeScreen(),
     ProfileScreen(),
   ];
 
@@ -45,7 +45,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: Icon(Icons.groups_outlined),
             selectedIcon: Icon(Icons.groups),
-            label: 'Groups',
+            label: 'Community',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
