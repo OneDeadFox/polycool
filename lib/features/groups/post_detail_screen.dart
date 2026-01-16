@@ -19,7 +19,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   final _replyCtrl = TextEditingController();
   bool _expandedBody = false;
 
-  // Reply target
   String? _replyToReplyId;
   String? _replyToPublicAuthor;
 
@@ -47,7 +46,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget build(BuildContext context) {
     final groups = context.watch<GroupsController>();
     final replies = groups.repliesForPost(widget.post.id);
-
     final threads = _buildThreads(replies);
 
     final body = widget.post.text;
@@ -95,26 +93,21 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 10),
-
                 if (threads.isEmpty)
                   Text(
                     'Add something supportive to start the conversation.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   )
                 else
-                  ...threads.map(
-                    (root) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _ThreadCard(
-                        root: root,
-                        onReplyTap: _setReplyTarget,
-                      ),
-                    ),
+                  _ConversationSection(
+                    roots: threads,
+                    onReplyTap: _setReplyTarget,
                   ),
               ],
             ),
           ),
 
+          // Composer
           SafeArea(
             top: false,
             child: Container(
@@ -164,7 +157,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         ),
                       ),
                     ),
-
                   Row(
                     children: [
                       Expanded(
@@ -221,12 +213,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 class _ThreadNode {
   final GroupReply reply;
   final List<_ThreadNode> children = [];
-
   _ThreadNode(this.reply);
 }
 
-/// Builds root threads, then attaches children under their parent.
-/// Sorts roots and children by createdAt (oldest → newest) so conversation reads naturally.
 List<_ThreadNode> _buildThreads(List<GroupReply> replies) {
   final byId = <String, _ThreadNode>{};
   for (final r in replies) {
@@ -234,11 +223,9 @@ List<_ThreadNode> _buildThreads(List<GroupReply> replies) {
   }
 
   final roots = <_ThreadNode>[];
-
   for (final r in replies) {
     final node = byId[r.id]!;
     final parentId = (r.replyToReplyId ?? '').trim();
-
     if (parentId.isNotEmpty && byId.containsKey(parentId)) {
       byId[parentId]!.children.add(node);
     } else {
@@ -246,6 +233,7 @@ List<_ThreadNode> _buildThreads(List<GroupReply> replies) {
     }
   }
 
+  // Sort chronologically (oldest -> newest) for natural reading
   void sortRec(_ThreadNode n) {
     n.children.sort(
       (a, b) => a.reply.createdAtMs.compareTo(b.reply.createdAtMs),
@@ -259,17 +247,107 @@ List<_ThreadNode> _buildThreads(List<GroupReply> replies) {
   for (final r in roots) {
     sortRec(r);
   }
-
   return roots;
 }
 
-/* ───────────────────────── UI ───────────────────────── */
+/// Layout row data used by the global painter.
+class CommentLayout {
+  final GroupReply reply;
+  final int depth; // true depth in tree (0..)
+  final bool hasChildren;
+  final int parentIndex; // -1 if none
+  int index;
 
-class _ThreadCard extends StatelessWidget {
-  final _ThreadNode root;
+  CommentLayout({
+    required this.reply,
+    required this.depth,
+    required this.hasChildren,
+    required this.parentIndex,
+    required this.index,
+  });
+
+  int vDepth(int maxDepth) => depth.clamp(0, maxDepth);
+}
+
+/* ───────────────────────── Conversation UI ───────────────────────── */
+
+class _ConversationSection extends StatefulWidget {
+  final List<_ThreadNode> roots;
   final ValueChanged<GroupReply> onReplyTap;
 
-  const _ThreadCard({required this.root, required this.onReplyTap});
+  const _ConversationSection({required this.roots, required this.onReplyTap});
+
+  @override
+  State<_ConversationSection> createState() => _ConversationSectionState();
+}
+
+class _ConversationSectionState extends State<_ConversationSection> {
+  // Visual tuning
+  static const double _indent = 14.0;
+  static const int _maxVDepth = 6; // ✅ now 6
+
+  // gutter geometry
+  static const double _gutterBase = 18.0; // padding before first trunk
+  static const double _lineOffset = 10.0; // x inside gutter where trunks sit
+  static const double _elbowLen = 14.0;
+
+  late List<CommentLayout> _layout;
+  final List<GlobalKey> _rowKeys = <GlobalKey>[];
+  final GlobalKey _stackKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _recompute();
+
+    // repaint once layout is available (row rects)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.roots != widget.roots) {
+      _recompute();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  void _recompute() {
+    _layout = _flatten(widget.roots);
+    _rowKeys
+      ..clear()
+      ..addAll(List.generate(_layout.length, (_) => GlobalKey()));
+  }
+
+  List<CommentLayout> _flatten(List<_ThreadNode> roots) {
+    final rows = <CommentLayout>[];
+
+    void rec(_ThreadNode node, int depth, int parentIndex) {
+      final i = rows.length;
+      rows.add(
+        CommentLayout(
+          reply: node.reply,
+          depth: depth,
+          hasChildren: node.children.isNotEmpty,
+          parentIndex: parentIndex,
+          index: i,
+        ),
+      );
+      for (final child in node.children) {
+        rec(child, depth + 1, i);
+      }
+    }
+
+    for (final root in roots) {
+      rec(root, 0, -1);
+    }
+    return rows;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -280,174 +358,57 @@ class _ThreadCard extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: _ThreadTree(
-        node: root,
-        depth: 0,
-        onReplyTap: onReplyTap,
-        // for a “reddit-ish” feel, we cap depth spacing but still indent each level
-        indentStep: 14,
-      ),
-    );
-  }
-}
-
-class _ThreadTree extends StatelessWidget {
-  final _ThreadNode node;
-  final int depth;
-  final ValueChanged<GroupReply> onReplyTap;
-  final double indentStep;
-
-  const _ThreadTree({
-    required this.node,
-    required this.depth,
-    required this.onReplyTap,
-    required this.indentStep,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final lineColor = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: 0.10);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _CompactReplyRow(
-          reply: node.reply,
-          depth: depth.clamp(0, 3),
-          indentStep: indentStep,
-          lineColor: lineColor,
-          onReplyTap: () => onReplyTap(node.reply),
-        ),
-
-        // children render directly under parent (conversation continuity)
-        for (final child in node.children)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: _ThreadTree(
-              node: child,
-              depth: depth + 1,
-              onReplyTap: onReplyTap,
-              indentStep: indentStep,
+      child: Stack(
+        key: _stackKey,
+        children: [
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _ConversationPainter(
+                  layouts: _layout,
+                  rowKeys: _rowKeys,
+                  stackKey: _stackKey,
+                  indent: _indent,
+                  gutterBase: _gutterBase,
+                  lineOffset: _lineOffset,
+                  elbowLen: _elbowLen,
+                  maxVDepth: _maxVDepth,
+                ),
+              ),
             ),
           ),
-      ],
-    );
-  }
-}
 
-class _CompactReplyRow extends StatelessWidget {
-  final GroupReply reply;
-  final int depth;
-  final double indentStep;
-  final Color lineColor;
-  final VoidCallback onReplyTap;
+          // Rows
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _layout.length,
+            itemBuilder: (context, i) {
+              final item = _layout[i];
+              final v = item.vDepth(_maxVDepth);
 
-  const _CompactReplyRow({
-    required this.reply,
-    required this.depth,
-    required this.indentStep,
-    required this.lineColor,
-    required this.onReplyTap,
-  });
+              final showGutter = v > 0;
+              final gutterWidth = showGutter
+                  ? (v * _indent) + _gutterBase
+                  : 0.0;
 
-  @override
-  Widget build(BuildContext context) {
-    // Clamp indentation visually to max 3 levels (per your spec)
-    final d = depth.clamp(0, 3);
-
-    // No thread lines for replies to the original post
-    // i.e., depth == 0 should have no gutter/lines.
-    final showLines = d > 0;
-
-    final replyingTo = (reply.replyToPublicAuthor ?? '').trim();
-    final gutterWidth = showLines ? (d * indentStep + 18) : 0.0;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (showLines)
-            SizedBox(
-              width: gutterWidth,
-              child: CustomPaint(
-                painter: _ThreadGutterPainter(
-                  depth: d,
-                  indentStep: indentStep,
-                  lineColor: lineColor,
-                  // the elbow should be drawn at the deepest visible level
-                  elbowLevel: d,
-                  elbowY: 18,
-                ),
-              ),
-            ),
-
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceVariant.withValues(alpha: 0.32),
-                border: Border.all(
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.75),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // header row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          reply.publicAuthor,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.78),
-                              ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: onReplyTap,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        child: const Text('Reply'),
-                      ),
-                    ],
-                  ),
-
-                  if (replyingTo.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'replying to $replyingTo',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.55),
-                        fontWeight: FontWeight.w600,
+              return Container(
+                key: _rowKeys[i],
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (showGutter) SizedBox(width: gutterWidth),
+                    Expanded(
+                      child: _CommentBubble(
+                        reply: item.reply,
+                        onReplyTap: () => widget.onReplyTap(item.reply),
                       ),
                     ),
                   ],
-
-                  const SizedBox(height: 6),
-                  Text(
-                    reply.text,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -455,50 +416,249 @@ class _CompactReplyRow extends StatelessWidget {
   }
 }
 
-class _ThreadGutterPainter extends CustomPainter {
-  final int depth; // already clamped 1..3
-  final double indentStep;
-  final Color lineColor;
+/* ───────────────────────── Global painter ───────────────────────── */
 
-  /// Which level should get the elbow into the bubble (usually == depth)
-  final int elbowLevel;
+class _ConversationPainter extends CustomPainter {
+  final List<CommentLayout> layouts;
+  final List<GlobalKey> rowKeys;
+  final GlobalKey stackKey;
 
-  /// Vertical position for elbow line (pixels from top)
-  final double elbowY;
+  final double indent;
+  final double gutterBase;
+  final double lineOffset;
+  final double elbowLen;
+  final int maxVDepth;
 
-  _ThreadGutterPainter({
-    required this.depth,
-    required this.indentStep,
-    required this.lineColor,
-    required this.elbowLevel,
-    required this.elbowY,
+  static const double _rowVPad =
+      6.0; // must match row padding in ListView.builder
+
+  _ConversationPainter({
+    required this.layouts,
+    required this.rowKeys,
+    required this.stackKey,
+    required this.indent,
+    required this.gutterBase,
+    required this.lineOffset,
+    required this.elbowLen,
+    required this.maxVDepth,
   });
+
+  // Where the elbow hits inside a row (relative to row top).
+  // Keep this aligned with your bubble padding + header height.
+  double _elbowY(Rect rowRect) => rowRect.top + _rowVPad + 22;
+
+  // X position of the trunk for a visual depth d (1..maxVDepth)
+  double _trunkX(int d) => gutterBase + ((d - 1) * indent) + lineOffset;
+
+  // X position of the bubble start for visual depth d
+  double _bubbleLeftX(int d) => gutterBase + (d * indent);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = lineColor
+    final Paint p = Paint()
       ..strokeWidth = 2
       ..style = PaintingStyle.stroke;
 
-    // Draw connected vertical lines for ALL levels up to depth.
-    // This creates "columns" that connect replies on the same indent level.
-    for (int level = 1; level <= depth; level++) {
-      final x = (level - 1) * indentStep + 8;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    // continuous rainbow shader down the entire conversation height
+    p.shader = const LinearGradient(
+      colors: [
+        Colors.red,
+        Colors.orange,
+        Colors.yellow,
+        Colors.green,
+        Colors.blue,
+        Colors.indigo,
+        Colors.purple,
+      ],
+      stops: [0.0, 0.14, 0.28, 0.42, 0.56, 0.70, 1.0],
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+    ).createShader(Rect.fromLTWH(0, 0, 1, size.height));
+
+    // Convert row rects into Stack-local coordinates (so we don’t depend on global screen coords).
+    final stackCtx = stackKey.currentContext;
+    final stackBox = stackCtx?.findRenderObject() as RenderBox?;
+    if (stackBox == null || !stackBox.hasSize) return;
+
+    final stackGlobal = stackBox.localToGlobal(Offset.zero);
+
+    final rects = <int, Rect>{};
+    for (int i = 0; i < rowKeys.length; i++) {
+      final ctx = rowKeys[i].currentContext;
+      if (ctx == null) continue;
+      final box = ctx.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) continue;
+
+      final rowGlobal = box.localToGlobal(Offset.zero);
+      final local = rowGlobal - stackGlobal;
+      rects[i] = local & box.size;
+    }
+    if (rects.isEmpty) return;
+
+    // We open/close vertical trunk segments per depth as we walk the flattened list.
+    // FIX 1: trunk STARTS at the *bottom of the parent bubble* (not inside the parent, not at child top).
+    // FIX 2: trunk ENDS exactly at the final elbow of that depth chain (no overshoot past branch end).
+
+    final openStartY = <int, double>{}; // depth -> startY
+    final lastElbowAtDepth = <int, double>{}; // depth -> last elbow we saw
+
+    // Helper: close a specific depth at a given endY.
+    void closeDepth(int d, double endY) {
+      final start = openStartY[d];
+      if (start == null) return;
+      canvas.drawLine(Offset(_trunkX(d), start), Offset(_trunkX(d), endY), p);
+      openStartY.remove(d);
     }
 
-    // Draw the elbow (horizontal) into the bubble for the deepest level
-    final elbowX = (elbowLevel - 1) * indentStep + 8;
-    canvas.drawLine(Offset(elbowX, elbowY), Offset(elbowX + 12, elbowY), paint);
+    // Iterate in visual order.
+    for (int i = 0; i < layouts.length; i++) {
+      final rowRect = rects[i];
+      if (rowRect == null) continue;
+
+      final v = layouts[i].vDepth(maxVDepth);
+
+      // Track elbows per depth for accurate closures.
+      if (v > 0) {
+        lastElbowAtDepth[v] = _elbowY(rowRect);
+      }
+
+      // Open depth trunk if needed.
+      if (v > 0 && !openStartY.containsKey(v)) {
+        final parentIdx = layouts[i].parentIndex;
+        final parentRect = parentIdx >= 0 ? rects[parentIdx] : null;
+
+        // ✅ start trunk at bottom of parent bubble (or fallback to this row elbow if missing)
+        final startY = parentRect != null
+            ? (parentRect.bottom - _rowVPad) // ✅ bottom of parent bubble
+            : _elbowY(rowRect);
+        openStartY[v] = startY;
+      }
+
+      // Determine next visible row depth (skipping rows without rects).
+      int nextV = 0;
+      for (int j = i + 1; j < layouts.length; j++) {
+        if (!rects.containsKey(j)) continue;
+        nextV = layouts[j].vDepth(maxVDepth);
+        break;
+      }
+
+      // If depth decreases, close all depths that should end here.
+      if (nextV < v) {
+        // close deeper trunks first
+        for (int d = v; d > nextV; d--) {
+          // ✅ end at this row’s elbow (the branch-end horizontal mark)
+          final endY = _elbowY(rowRect);
+          closeDepth(d, endY);
+        }
+      }
+    }
+
+    // Close any trunks still open at the end using the last elbow per depth (prevents overshoot).
+    final remaining = openStartY.keys.toList()..sort();
+    for (final d in remaining) {
+      final endY = lastElbowAtDepth[d];
+      if (endY == null) continue;
+      closeDepth(d, endY);
+    }
+
+    // Draw elbows (horizontal lines) that touch the bubble.
+    for (int i = 0; i < layouts.length; i++) {
+      final rowRect = rects[i];
+      if (rowRect == null) continue;
+
+      final v = layouts[i].vDepth(maxVDepth);
+      if (v <= 0) continue;
+
+      final y = _elbowY(rowRect);
+      final startX = _trunkX(v);
+      final endX = _bubbleLeftX(v); // touches bubble
+
+      canvas.drawLine(Offset(startX, y), Offset(endX, y), p);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _ThreadGutterPainter oldDelegate) {
-    return oldDelegate.depth != depth ||
-        oldDelegate.indentStep != indentStep ||
-        oldDelegate.lineColor != lineColor ||
-        oldDelegate.elbowLevel != elbowLevel ||
-        oldDelegate.elbowY != elbowY;
+  bool shouldRepaint(covariant _ConversationPainter old) {
+    return old.layouts != layouts ||
+        old.rowKeys != rowKeys ||
+        old.stackKey != stackKey ||
+        old.indent != indent ||
+        old.gutterBase != gutterBase ||
+        old.lineOffset != lineOffset ||
+        old.elbowLen != elbowLen ||
+        old.maxVDepth != maxVDepth;
+  }
+}
+
+/* ───────────────────────── Reply bubble ───────────────────────── */
+
+class _CommentBubble extends StatelessWidget {
+  final GroupReply reply;
+  final VoidCallback onReplyTap;
+
+  const _CommentBubble({required this.reply, required this.onReplyTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final authorStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontWeight: FontWeight.w800,
+      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.78),
+    );
+
+    final replyingTo = (reply.replyToPublicAuthor ?? '').trim();
+    final hasReplyingTo = replyingTo.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceVariant.withValues(alpha: 0.32),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.75),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  reply.publicAuthor,
+                  style: authorStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: onReplyTap,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text('Reply'),
+              ),
+            ],
+          ),
+          if (hasReplyingTo) ...[
+            const SizedBox(height: 2),
+            Text(
+              'replying to $replyingTo',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.55),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(reply.text, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
   }
 }

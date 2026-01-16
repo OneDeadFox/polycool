@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../shared/persistence/app_storage.dart';
-
+import '../shared/controllers/block_controller.dart';
+import '../shared/controllers/report_controller.dart';
 import '../shared/controllers/monetization_controller.dart';
+
 import '../features/discover/discover_controller.dart';
 import '../features/profile/controllers/profile_controller.dart';
 import '../features/profile/controllers/reflection_controller.dart';
@@ -54,6 +56,14 @@ class PolycoolApp extends StatelessWidget {
 
         ChangeNotifierProvider(
           create: (_) => GroupsController(storage: storage),
+        ),
+
+        ChangeNotifierProvider(
+          create: (_) => BlockController(storage: storage),
+        ),
+        
+        ChangeNotifierProvider(
+          create: (_) => ReportController(storage: storage),
         ),
 
         // Monetization / Super Likes / Subscription

@@ -26,6 +26,29 @@ class AppStorage {
   static const _kGroupsList =
       'groups_list_v1'; // json list of CommunityGroup maps
   static const _kGroupReplies = 'group_replies_v1';
+  static const _kBlockedUserIds = 'blocked_user_ids';
+  static const _kReports = 'reports_v1';
+
+  List<String> loadBlockedUserIds() {
+    final raw = _prefs.getString(_kBlockedUserIds);
+    if (raw == null || raw.isEmpty) return const [];
+    final list = decodeJsonList(raw);
+    return list.map((e) => e.toString()).toList();
+  }
+
+  Future<void> saveBlockedUserIds(List<String> ids) async {
+    await _prefs.setString(_kBlockedUserIds, encodeJsonList(ids));
+  }
+
+  List<Map<String, dynamic>> loadReportsRaw() {
+    final raw = _prefs.getString(_kReports);
+    if (raw == null || raw.isEmpty) return const [];
+    return decodeJsonList(raw).cast<Map<String, dynamic>>();
+  }
+
+  Future<void> saveReportsRaw(List<Map<String, dynamic>> reports) async {
+    await _prefs.setString(_kReports, encodeJsonList(reports));
+  }
 
   List<Map<String, dynamic>> loadGroupRepliesRaw() {
     final raw = _prefs.getString(_kGroupReplies);
